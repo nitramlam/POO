@@ -1,0 +1,21 @@
+# Logs et fichiers temporaires
+*.log
+tmp/
+
+# Vendor (si Composer)
+vendor/
+
+# Node modules (si jamais tu en ajoutes)
+node_modules/
+
+# Environnement local
+.env
+.env.local
+
+# Fichiers PHPStorm, VSCode, macOS
+.idea/
+.vscode/
+.DS_Store
+
+# Docker
+poo_db-data/
