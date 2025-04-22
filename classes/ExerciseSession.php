@@ -28,13 +28,6 @@ class ExerciseSession {
         $this->target_weight = $target_weight;
     }
 
-    /**
-     * Récupère tous les exercices associés à une session
-     *
-     * @param PDO $conn
-     * @param int $sessionId
-     * @return ExerciseSession[]
-     */
     public static function fetchBySession(PDO $conn, int $sessionId): array {
         $sql = "
             SELECT id, exercise_id, session_id, weight, repetitions, sets, target_weight
@@ -44,19 +37,48 @@ class ExerciseSession {
         $stmt = $conn->prepare($sql);
         $stmt->execute(['sid' => $sessionId]);
         $list = [];
-
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $list[] = new ExerciseSession(
                 (int)$row['id'],
                 (int)$row['exercise_id'],
                 (int)$row['session_id'],
-                $row['weight'] !== null ? (float)$row['weight'] : null,
-                $row['repetitions'] !== null ? (int)$row['repetitions'] : null,
-                $row['sets'] !== null ? (int)$row['sets'] : null,
+                $row['weight']        !== null ? (float)$row['weight']        : null,
+                $row['repetitions']   !== null ? (int)$row['repetitions']     : null,
+                $row['sets']          !== null ? (int)$row['sets']            : null,
                 $row['target_weight'] !== null ? (float)$row['target_weight'] : null
             );
         }
-
         return $list;
+    }
+
+    public static function addToSession(
+        PDO $conn,
+        int $sessionId,
+        int $exerciseId,
+        ?float $weight,
+        ?int $repetitions,
+        ?int $sets,
+        ?float $targetWeight
+    ): bool {
+        $sql = "
+            INSERT INTO exercises_sessions
+            (session_id, exercise_id, weight, repetitions, sets, target_weight)
+            VALUES
+            (:sid, :eid, :w, :r, :s, :tw)
+        ";
+        $stmt = $conn->prepare($sql);
+        return $stmt->execute([
+            'sid' => $sessionId,
+            'eid' => $exerciseId,
+            'w'   => $weight,
+            'r'   => $repetitions,
+            's'   => $sets,
+            'tw'  => $targetWeight
+        ]);
+    }
+
+    public static function remove(PDO $conn, int $id): bool {
+        $stmt = $conn->prepare("DELETE FROM exercises_sessions WHERE id = :id");
+        return $stmt->execute(['id' => $id]);
     }
 }
