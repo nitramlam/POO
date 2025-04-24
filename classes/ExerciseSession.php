@@ -1,4 +1,6 @@
 <?php
+// classes/ExerciseSession.php
+
 require_once __DIR__ . '/Database.php';
 
 class ExerciseSession {
@@ -28,6 +30,10 @@ class ExerciseSession {
         $this->target_weight = $target_weight;
     }
 
+    /**
+     * Récupère toutes les entrées pour une session donnée
+     * @return ExerciseSession[]
+     */
     public static function fetchBySession(PDO $conn, int $sessionId): array {
         $sql = "
             SELECT id, exercise_id, session_id, weight, repetitions, sets, target_weight
@@ -51,20 +57,22 @@ class ExerciseSession {
         return $list;
     }
 
+    /**
+     * Ajoute un exercice à une session
+     */
     public static function addToSession(
         PDO $conn,
         int $sessionId,
         int $exerciseId,
-        ?float $weight,
-        ?int $repetitions,
-        ?int $sets,
-        ?float $targetWeight
+        ?float $weight = 0,
+        ?int $repetitions = 0,
+        ?int $sets = 0,
+        ?float $targetWeight = 0
     ): bool {
         $sql = "
             INSERT INTO exercises_sessions
             (session_id, exercise_id, weight, repetitions, sets, target_weight)
-            VALUES
-            (:sid, :eid, :w, :r, :s, :tw)
+            VALUES (:sid, :eid, :w, :r, :s, :tw)
         ";
         $stmt = $conn->prepare($sql);
         return $stmt->execute([
@@ -77,6 +85,38 @@ class ExerciseSession {
         ]);
     }
 
+    /**
+     * Met à jour une entrée existante
+     */
+    public static function updateEntry(
+        PDO $conn,
+        int $id,
+        float $weight,
+        int $repetitions,
+        int $sets,
+        float $targetWeight
+    ): bool {
+        $sql = "
+            UPDATE exercises_sessions
+            SET weight        = :weight,
+                repetitions   = :reps,
+                sets          = :sets,
+                target_weight = :tw
+            WHERE id = :id
+        ";
+        $stmt = $conn->prepare($sql);
+        return $stmt->execute([
+            'weight' => $weight,
+            'reps'   => $repetitions,
+            'sets'   => $sets,
+            'tw'     => $targetWeight,
+            'id'     => $id
+        ]);
+    }
+
+    /**
+     * Supprime une entrée existante
+     */
     public static function remove(PDO $conn, int $id): bool {
         $stmt = $conn->prepare("DELETE FROM exercises_sessions WHERE id = :id");
         return $stmt->execute(['id' => $id]);

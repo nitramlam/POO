@@ -1,90 +1,121 @@
 <?php
-// 1) Initialisation (connexion + menu)
+// public/admin_users.php : gestion des utilisateurs stylisée avec icônes et ancrage
+
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/../classes/User.php';
+require_once __DIR__ . '/../classes/Tailwind.php';
 
-// 2) Traitement des actions CRUD
-// 2a. Suppression si ?delete=ID
+// CRUD
 if (!empty($_GET['delete']) && is_numeric($_GET['delete'])) {
     User::delete($conn, (int)$_GET['delete']);
-    header('Location: /admin_users.php');
+    header('Location: /admin_users.php#user-' . (int)$_GET['delete']);
     exit;
 }
 
-// 2b. Création
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
-    $name = trim($_POST['name'] ?? '');
-    if ($name !== '') {
-        User::create($conn, $name);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action']) && $_POST['action'] === 'create') {
+        $name = trim($_POST['name'] ?? '');
+        if ($name !== '') {
+            User::create($conn, $name);
+        }
     }
-    header('Location: /admin_users.php');
-    exit;
-}
-
-// 2c. Mise à jour
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update') {
-    $id   = (int)($_POST['id'] ?? 0);
-    $name = trim($_POST['name'] ?? '');
-    if ($id > 0 && $name !== '') {
-        User::update($conn, $id, $name);
+    if (isset($_POST['action']) && $_POST['action'] === 'update') {
+        $id   = (int)($_POST['id'] ?? 0);
+        $name = trim($_POST['name'] ?? '');
+        if ($id > 0 && $name !== '') {
+            User::update($conn, $id, $name);
+        }
     }
-    header('Location: /admin_users.php');
+    $anchorId = $_POST['action'] === 'update' ? $_POST['id'] : (isset($_POST['name']) ? '' : '');
+    header('Location: /admin_users.php#user-' . $anchorId);
     exit;
 }
 
-// 3) Récupération de tous les utilisateurs
+// Récupération des utilisateurs
 $users = User::fetchAll($conn);
 
-// 4) Vérifier si on est en mode édition pour un utilisateur
-$editId = !empty($_GET['edit']) && is_numeric($_GET['edit'])
-    ? (int)$_GET['edit']
-    : null;
+// Mode édition
+$editId = null;
+if (!empty($_GET['edit']) && is_numeric($_GET['edit'])) {
+    $editId = (int)$_GET['edit'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>🛠️ Gestion des utilisateurs</title>
+  <meta charset="UTF-8">
+  <title>👥 Gestion des utilisateurs</title>
+  <?= Tailwind::includeCdn() ?>
 </head>
-<body>
-    <h1>👥 Gestion des utilisateurs</h1>
+<body class="bg-gray-50 min-h-screen">
+ 
 
-    <!-- Formulaire de création -->
-    <h2>Ajouter un utilisateur</h2>
-    <form action="/admin_users.php" method="post">
+  <main class="container mx-auto px-4 py-8">
+    <!-- Formulaire d'ajout -->
+    <div class="bg-white shadow rounded-lg p-6 mb-8">
+      <form method="post" action="/admin_users.php" class="flex space-x-4 items-center">
         <input type="hidden" name="action" value="create">
-        <input type="text" name="name" placeholder="Nom de l'utilisateur" required>
-        <button type="submit">Créer</button>
-    </form>
-
-    <hr>
+        <input name="name" required maxlength="20" placeholder="Nouvel utilisateur"
+               class="flex-1 border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        <button type="submit"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-md transition flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Ajouter
+        </button>
+      </form>
+    </div>
 
     <!-- Liste des utilisateurs -->
-    <h2>Utilisateurs existants</h2>
-    <?php if (!empty($users)): ?>
-        <ul>
-            <?php foreach ($users as $u): ?>
-                <li>
-                    <?php if ($editId === $u->id): ?>
-                        <!-- Formulaire d'édition inline -->
-                        <form action="/admin_users.php" method="post" style="display:inline;">
-                            <input type="hidden" name="action" value="update">
-                            <input type="hidden" name="id" value="<?= htmlspecialchars($u->id) ?>">
-                            <input type="text" name="name" value="<?= htmlspecialchars($u->name) ?>" required>
-                            <button type="submit">Sauvegarder</button>
-                            <a href="/admin_users.php">Annuler</a>
-                        </form>
-                    <?php else: ?>
-                        <?= htmlspecialchars($u->name) ?>
-                        <a href="/admin_users.php?edit=<?= $u->id ?>">✏️</a>
-                        <a href="/admin_users.php?delete=<?= $u->id ?>"
-                           onclick="return confirm('Supprimer <?= htmlspecialchars($u->name) ?> ?')">🗑️</a>
-                    <?php endif; ?>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    <?php else: ?>
-        <p>Aucun utilisateur enregistré.</p>
-    <?php endif; ?>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <?php foreach ($users as $u): ?>
+        <div id="user-<?= $u->id ?>" class="bg-white border border-gray-200 rounded-lg p-4 space-y-4 shadow hover:shadow-lg transition">
+          <?php if ($editId === $u->id): ?>
+            <form method="post" action="/admin_users.php" class="space-y-3">
+              <input type="hidden" name="action" value="update">
+              <input type="hidden" name="id" value="<?= $u->id ?>">
+              <input name="name" value="<?= htmlspecialchars($u->name) ?>" required maxlength="20"
+                     class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-300" />
+              <div class="flex justify-end space-x-2">
+                <button type="submit"
+                        class="bg-green-500 hover:bg-green-600 text-white p-2 rounded-md transition">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+                <a href="/admin_users.php#user-<?= $u->id ?>"
+                   class="bg-red-500 hover:bg-red-600 text-white p-2 rounded-md transition">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </a>
+              </div>
+            </form>
+          <?php else: ?>
+            <div class="flex justify-between items-center">
+              <span class="font-medium text-gray-800"><?= htmlspecialchars($u->name) ?></span>
+              <div class="flex space-x-2">
+                <a href="/admin_users.php?edit=<?= $u->id ?>#user-<?= $u->id ?>"
+                   class="bg-green-400 hover:bg-green-500 text-white p-2 rounded-md transition" title="Modifier">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a1.5 1.5 0 012.121 2.122L7 21H3v-4L16.732 3.732z" />
+                  </svg>
+                </a>
+                <a href="/admin_users.php?delete=<?= $u->id ?>#user-<?= $u->id ?>"
+                   onclick="return confirm('Supprimer <?= htmlspecialchars($u->name) ?> ?')"
+                   class="bg-red-500 hover:bg-red-600 text-white p-2 rounded-md transition" title="Supprimer">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          <?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+    </div>
+
+  </main>
 </body>
 </html>
