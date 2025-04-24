@@ -3,6 +3,7 @@
 
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/../classes/ExerciseSession.php';
+require_once __DIR__ . '/../classes/Tailwind.php';
 
 // 1) Suppression d’une affectation unique
 if (!empty($_GET['delete']) && is_numeric($_GET['delete'])) {
@@ -11,38 +12,31 @@ if (!empty($_GET['delete']) && is_numeric($_GET['delete'])) {
     exit;
 }
 
-// 2) Ajout d’un exercice à plusieurs sessions
+// 2) Création : exercice à plusieurs sessions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
     $sessionIds   = $_POST['session_ids']   ?? [];
     $exerciseName = trim($_POST['exercise_name'] ?? '');
-
-    // Par défaut, éviter les nulls en mettant 0
+    // no nulls → 0
     $weight       = $_POST['weight']        !== '' ? (float)$_POST['weight']        : 0.0;
     $reps         = $_POST['repetitions']   !== '' ? (int)  $_POST['repetitions']     : 0;
     $sets         = $_POST['sets']          !== '' ? (int)  $_POST['sets']            : 0;
     $target       = $_POST['target_weight'] !== '' ? (float)$_POST['target_weight'] : 0.0;
 
     if ($exerciseName !== '' && count($sessionIds) > 0) {
-        // Cherche ou crée l'exercice
+        // find or insert exercise
         $stmt = $conn->prepare("SELECT id FROM exercises WHERE name = :name");
-        $stmt->execute(['name' => $exerciseName]);
+        $stmt->execute(['name'=>$exerciseName]);
         $eid = $stmt->fetchColumn();
         if (!$eid) {
             $ins = $conn->prepare("INSERT INTO exercises (name) VALUES (:name)");
-            $ins->execute(['name' => $exerciseName]);
+            $ins->execute(['name'=>$exerciseName]);
             $eid = (int)$conn->lastInsertId();
         }
-        // Ajoute pour chaque session cochée
+        // add to each session
         foreach ($sessionIds as $sid) {
             if (is_numeric($sid)) {
                 ExerciseSession::addToSession(
-                    $conn,
-                    (int)$sid,
-                    $eid,
-                    $weight,
-                    $reps,
-                    $sets,
-                    $target
+                    $conn,(int)$sid,$eid,$weight,$reps,$sets,$target
                 );
             }
         }
@@ -51,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     exit;
 }
 
-// 3) Récupération de toutes les sessions avec leur utilisateur
+// 3) Fetch all sessions with their users
 $sessions = [];
 $sql = "
   SELECT s.id,
@@ -68,13 +62,13 @@ foreach ($conn->query($sql) as $row) {
     ];
 }
 
-// 4) Récupération des affectations existantes
-$data = [];
+// 4) Fetch all assignments and group by user
+$assign = [];
 $sql2 = "
   SELECT es.id,
-         u.name   AS user_name,
-         s.name   AS session_name,
-         e.name   AS exercise_name,
+         u.name         AS user_name,
+         s.name         AS session_name,
+         e.name         AS exercise_name,
          es.weight, es.repetitions, es.sets, es.target_weight
     FROM exercises_sessions es
     JOIN exercises e  ON es.exercise_id = e.id
@@ -83,15 +77,10 @@ $sql2 = "
    ORDER BY u.name, s.name, e.name
 ";
 foreach ($conn->query($sql2) as $r) {
-    $data[] = [
-        htmlspecialchars($r['user_name']),
-        htmlspecialchars($r['session_name']),
-        htmlspecialchars($r['exercise_name']),
-        htmlspecialchars($r['weight']        ?? '0'),
-        htmlspecialchars($r['repetitions']   ?? '0'),
-        htmlspecialchars($r['sets']          ?? '0'),
-        htmlspecialchars($r['target_weight'] ?? '0'),
-        "<a href=\"/admin_exercises.php?delete={$r['id']}\" onclick=\"return confirm('Supprimer cette affectation ?')\">🗑️</a>"
+    $assign[$r['user_name']][] = [
+        'id'            => $r['id'],
+        'session_name'  => $r['session_name'],
+        'exercise_name' => $r['exercise_name']
     ];
 }
 ?>
@@ -99,121 +88,143 @@ foreach ($conn->query($sql2) as $r) {
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>🏋️ Admin Exercices</title>
+  <title>🏋️ Gestion des Exercices</title>
+  <?= Tailwind::includeCdn() ?>
 </head>
-<body>
-  <!-- header inclus via init.php -->
+<body class="bg-gray-50 min-h-screen">
+  <main class="max-w-5xl mx-auto p-6 space-y-8">
 
-  <h1>Affecter un exercice à plusieurs sessions</h1>
-
-  <form method="post" action="/admin_exercises.php">
-    <input type="hidden" name="action" value="create">
-
-    <div>
-      <label for="exercise_name">Nom de l'exercice :</label><br>
-      <input
-        type="text"
-        id="exercise_name"
-        name="exercise_name"
-        maxlength="20"
-        required
-      >
+    <!-- En-tête -->
+    <div class="bg-white rounded-lg shadow p-6 text-center">
+      <h1 class="text-2xl font-bold text-blue-800 flex items-center justify-center space-x-2">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="h-6 w-6 text-blue-600"
+             fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+        <span>Gestion des Exercices</span>
+      </h1>
+      <p class="text-blue-600">Ajouter des exercices aux sessions</p>
     </div>
 
-    <fieldset style="margin-top:1em;">
-      <legend>Choisir les sessions :</legend>
-      <?php foreach ($sessions as $s): ?>
-        <label style="display:block; margin:4px 0;">
-          <input
-            type="checkbox"
-            name="session_ids[]"
-            value="<?= $s['id'] ?>"
-          >
-          <?= htmlspecialchars($s['label']) ?>
-        </label>
-      <?php endforeach; ?>
-    </fieldset>
-
-    <div style="margin-top:1em;">
-      <label for="weight">Poids :</label><br>
-      <input
-        type="number"
-        id="weight"
-        name="weight"
-        step="0.01"
-        max="999.99"
-        value="0"
-      >
-    </div>
-    <div>
-      <label for="repetitions">Répétitions :</label><br>
-      <input
-        type="number"
-        id="repetitions"
-        name="repetitions"
-        max="999"
-        value="0"
-      >
-    </div>
-    <div>
-      <label for="sets">Séries :</label><br>
-      <input
-        type="number"
-        id="sets"
-        name="sets"
-        max="999"
-        value="0"
-      >
-    </div>
-    <div>
-      <label for="target_weight">Objectif poids :</label><br>
-      <input
-        type="number"
-        id="target_weight"
-        name="target_weight"
-        step="0.01"
-        max="999.99"
-        value="0"
-      >
-    </div>
-
-    <div style="margin-top:1em;">
-      <button type="submit">Ajouter</button>
-    </div>
-  </form>
-
-  <hr>
-
-  <h2>Exercices assignés</h2>
-  <?php if ($data): ?>
-    <table border="1" cellpadding="5" cellspacing="0">
-      <thead>
-        <tr>
-          <th>Utilisateur</th>
-          <th>Session</th>
-          <th>Exercice</th>
-          <th>Poids</th>
-          <th>Rép.</th>
-          <th>Sér.</th>
-          <th>Cible</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($data as $row): ?>
-          <tr>
-            <?php foreach ($row as $cell): ?>
-              <td><?= $cell ?></td>
+    <!-- Formulaire de création -->
+    <div class="bg-white rounded-lg shadow p-6 space-y-6">
+      <h2 class="text-xl font-semibold text-gray-800 flex items-center space-x-2">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="h-5 w-5 text-blue-600"
+             fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 4v16m8-8H4"/>
+        </svg>
+        <span>Créer un nouvel exercice</span>
+      </h2>
+      <form method="post" action="/admin_exercises.php" class="space-y-4">
+        <input type="hidden" name="action" value="create">
+        <!-- Exo name -->
+        <input type="text"
+               name="exercise_name"
+               maxlength="50"
+               placeholder="Ex: Développé couché"
+               required
+               class="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring-blue-300 focus:border-blue-300" />
+        <!-- Sessions grid -->
+        <div>
+          <h3 class="text-gray-700 font-medium mb-2 flex items-center space-x-2">
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="h-5 w-5 text-blue-600"
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 002-2v-7H3v7a2 2 0 002 2z"/>
+            </svg>
+            <span>Sélectionnez les sessions</span>
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <?php foreach ($sessions as $s): ?>
+              <label class="flex items-center space-x-2 p-4 border border-gray-200 rounded-lg hover:shadow">
+                <input type="checkbox" name="session_ids[]" value="<?= $s['id'] ?>"
+                       class="h-5 w-5 text-blue-600 border-gray-300 rounded" />
+                <div>
+                  <p class="font-medium text-gray-800"><?= htmlspecialchars($s['label']) ?></p>
+                </div>
+              </label>
             <?php endforeach; ?>
-          </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  <?php else: ?>
-    <p>Aucune affectation d'exercice.</p>
-  <?php endif; ?>
+          </div>
+        </div>
+        <button type="submit"
+                class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-md transition">
+          + Créer et ajouter aux sessions
+        </button>
+      </form>
+    </div>
 
-  <p><a href="/admin_users.php">← Gérer les utilisateurs</a></p>
-  <p><a href="/index.php">← Accueil</a></p>
+    <!-- Répartition des exercices -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+      <div class="bg-blue-600 text-white px-6 py-3 flex items-center space-x-2">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="h-5 w-5"
+             fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+        <span class="font-semibold">Répartition des exercices</span>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <?php foreach ($assign as $user => $list): ?>
+          <details class="border border-gray-200 rounded-lg">
+            <summary class="cursor-pointer px-4 py-2 font-medium text-gray-800 flex justify-between items-center">
+              <span><?= htmlspecialchars($user) ?></span>
+              <svg xmlns="http://www.w3.org/2000/svg"
+                   class="h-4 w-4 text-gray-600 transform transition-transform group-open:rotate-180"
+                   fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 9l-7 7-7-7"/>
+              </svg>
+            </summary>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4">
+              <?php foreach ($list as $item): ?>
+                <div class="border border-gray-200 rounded-lg p-4 flex flex-col space-y-2">
+                  <h3 class="font-medium text-gray-800 flex items-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-5 w-5 text-blue-600"
+                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                    <span><?= htmlspecialchars($item['exercise_name']) ?></span>
+                  </h3>
+                  <p class="text-gray-600 flex items-center space-x-1">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-4 w-4"
+                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M3 7v4m0 0v4m0-4h18"/>
+                    </svg>
+                    <span><?= htmlspecialchars($item['session_name']) ?></span>
+                  </p>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          </details>
+        <?php endforeach; ?>
+      </div>
+    </div>
+
+  </main>
 </body>
 </html>
