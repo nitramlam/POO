@@ -1,159 +1,219 @@
 <?php
+// public/admin_exercises.php
+
 require_once __DIR__ . '/init.php';
-require_once __DIR__ . '/../classes/Session.php';
 require_once __DIR__ . '/../classes/ExerciseSession.php';
 
-// 1) Détection des actions CRUD
-// 1a. Suppression
+// 1) Suppression d’une affectation unique
 if (!empty($_GET['delete']) && is_numeric($_GET['delete'])) {
     ExerciseSession::remove($conn, (int)$_GET['delete']);
-    $sid = isset($_GET['session_id']) ? '&session_id=' . (int)$_GET['session_id'] : '';
-    header('Location: /admin_exercises.php?' . ltrim($sid, '&'));
+    header('Location: /admin_exercises.php');
     exit;
 }
 
-// 1b. Création
+// 2) Ajout d’un exercice à plusieurs sessions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
-    $sid  = (int)($_POST['session_id'] ?? 0);
-    $name = trim($_POST['exercise_name'] ?? '');
-    $w    = $_POST['weight']        !== '' ? (float)$_POST['weight']        : null;
-    $r    = $_POST['repetitions']   !== '' ? (int)$_POST['repetitions']     : null;
-    $s    = $_POST['sets']          !== '' ? (int)$_POST['sets']            : null;
-    $tw   = $_POST['target_weight'] !== '' ? (float)$_POST['target_weight'] : null;
+    $sessionIds   = $_POST['session_ids']   ?? [];
+    $exerciseName = trim($_POST['exercise_name'] ?? '');
 
-    if ($sid > 0 && $name !== '') {
-        // 1. Cherche ou crée l'exercice dans la table exercises
+    // Par défaut, éviter les nulls en mettant 0
+    $weight       = $_POST['weight']        !== '' ? (float)$_POST['weight']        : 0.0;
+    $reps         = $_POST['repetitions']   !== '' ? (int)  $_POST['repetitions']     : 0;
+    $sets         = $_POST['sets']          !== '' ? (int)  $_POST['sets']            : 0;
+    $target       = $_POST['target_weight'] !== '' ? (float)$_POST['target_weight'] : 0.0;
+
+    if ($exerciseName !== '' && count($sessionIds) > 0) {
+        // Cherche ou crée l'exercice
         $stmt = $conn->prepare("SELECT id FROM exercises WHERE name = :name");
-        $stmt->execute(['name' => $name]);
+        $stmt->execute(['name' => $exerciseName]);
         $eid = $stmt->fetchColumn();
         if (!$eid) {
             $ins = $conn->prepare("INSERT INTO exercises (name) VALUES (:name)");
-            $ins->execute(['name' => $name]);
+            $ins->execute(['name' => $exerciseName]);
             $eid = (int)$conn->lastInsertId();
         }
-
-        // 2. Ajout dans exercises_sessions
-        ExerciseSession::addToSession($conn, $sid, $eid, $w, $r, $s, $tw);
+        // Ajoute pour chaque session cochée
+        foreach ($sessionIds as $sid) {
+            if (is_numeric($sid)) {
+                ExerciseSession::addToSession(
+                    $conn,
+                    (int)$sid,
+                    $eid,
+                    $weight,
+                    $reps,
+                    $sets,
+                    $target
+                );
+            }
+        }
     }
-
-    header('Location: /admin_exercises.php?session_id=' . $sid);
+    header('Location: /admin_exercises.php');
     exit;
 }
 
-// 2) Récupération des sessions disponibles
+// 3) Récupération de toutes les sessions avec leur utilisateur
 $sessions = [];
-foreach ($conn->query("SELECT id, name FROM sessions") as $row) {
-    $sessions[(int)$row['id']] = $row['name'];
+$sql = "
+  SELECT s.id,
+         u.name AS user_name,
+         s.name AS session_name
+    FROM sessions s
+    JOIN users u ON s.user_id = u.id
+   ORDER BY u.name, s.name
+";
+foreach ($conn->query($sql) as $row) {
+    $sessions[] = [
+        'id'    => $row['id'],
+        'label' => "{$row['user_name']} — {$row['session_name']}"
+    ];
 }
 
-// 3) Session sélectionnée
-$selected = (!empty($_GET['session_id']) && is_numeric($_GET['session_id']))
-    ? (int)$_GET['session_id']
-    : null;
-
-// 4) Récupération des exercices de la session
-$entries = $selected
-    ? ExerciseSession::fetchBySession($conn, $selected)
-    : [];
+// 4) Récupération des affectations existantes
+$data = [];
+$sql2 = "
+  SELECT es.id,
+         u.name   AS user_name,
+         s.name   AS session_name,
+         e.name   AS exercise_name,
+         es.weight, es.repetitions, es.sets, es.target_weight
+    FROM exercises_sessions es
+    JOIN exercises e  ON es.exercise_id = e.id
+    JOIN sessions s   ON es.session_id  = s.id
+    JOIN users u      ON s.user_id       = u.id
+   ORDER BY u.name, s.name, e.name
+";
+foreach ($conn->query($sql2) as $r) {
+    $data[] = [
+        htmlspecialchars($r['user_name']),
+        htmlspecialchars($r['session_name']),
+        htmlspecialchars($r['exercise_name']),
+        htmlspecialchars($r['weight']        ?? '0'),
+        htmlspecialchars($r['repetitions']   ?? '0'),
+        htmlspecialchars($r['sets']          ?? '0'),
+        htmlspecialchars($r['target_weight'] ?? '0'),
+        "<a href=\"/admin_exercises.php?delete={$r['id']}\" onclick=\"return confirm('Supprimer cette affectation ?')\">🗑️</a>"
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>🏋️ Gestion des exercices</title>
+  <meta charset="UTF-8">
+  <title>🏋️ Admin Exercices</title>
 </head>
 <body>
-    <h1>🏋️ Gestion des exercices</h1>
+  <!-- header inclus via init.php -->
 
-    <!-- Sélecteur de session -->
-    <form method="get" action="/admin_exercises.php">
-        <label for="session_id">Choisir une session :</label>
-        <select name="session_id" id="session_id" required>
-            <option value="">-- Sélectionnez --</option>
-            <?php foreach ($sessions as $id => $name): ?>
-                <option value="<?= $id ?>"<?= $selected === $id ? ' selected' : '' ?>>
-                    <?= htmlspecialchars($name) ?>
-                </option>
+  <h1>Affecter un exercice à plusieurs sessions</h1>
+
+  <form method="post" action="/admin_exercises.php">
+    <input type="hidden" name="action" value="create">
+
+    <div>
+      <label for="exercise_name">Nom de l'exercice :</label><br>
+      <input
+        type="text"
+        id="exercise_name"
+        name="exercise_name"
+        maxlength="20"
+        required
+      >
+    </div>
+
+    <fieldset style="margin-top:1em;">
+      <legend>Choisir les sessions :</legend>
+      <?php foreach ($sessions as $s): ?>
+        <label style="display:block; margin:4px 0;">
+          <input
+            type="checkbox"
+            name="session_ids[]"
+            value="<?= $s['id'] ?>"
+          >
+          <?= htmlspecialchars($s['label']) ?>
+        </label>
+      <?php endforeach; ?>
+    </fieldset>
+
+    <div style="margin-top:1em;">
+      <label for="weight">Poids :</label><br>
+      <input
+        type="number"
+        id="weight"
+        name="weight"
+        step="0.01"
+        max="999.99"
+        value="0"
+      >
+    </div>
+    <div>
+      <label for="repetitions">Répétitions :</label><br>
+      <input
+        type="number"
+        id="repetitions"
+        name="repetitions"
+        max="999"
+        value="0"
+      >
+    </div>
+    <div>
+      <label for="sets">Séries :</label><br>
+      <input
+        type="number"
+        id="sets"
+        name="sets"
+        max="999"
+        value="0"
+      >
+    </div>
+    <div>
+      <label for="target_weight">Objectif poids :</label><br>
+      <input
+        type="number"
+        id="target_weight"
+        name="target_weight"
+        step="0.01"
+        max="999.99"
+        value="0"
+      >
+    </div>
+
+    <div style="margin-top:1em;">
+      <button type="submit">Ajouter</button>
+    </div>
+  </form>
+
+  <hr>
+
+  <h2>Exercices assignés</h2>
+  <?php if ($data): ?>
+    <table border="1" cellpadding="5" cellspacing="0">
+      <thead>
+        <tr>
+          <th>Utilisateur</th>
+          <th>Session</th>
+          <th>Exercice</th>
+          <th>Poids</th>
+          <th>Rép.</th>
+          <th>Sér.</th>
+          <th>Cible</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($data as $row): ?>
+          <tr>
+            <?php foreach ($row as $cell): ?>
+              <td><?= $cell ?></td>
             <?php endforeach; ?>
-        </select>
-        <button type="submit">Voir</button>
-    </form>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php else: ?>
+    <p>Aucune affectation d'exercice.</p>
+  <?php endif; ?>
 
-    <?php if ($selected): ?>
-        <hr>
-        <h2>Ajouter un exercice à « <?= htmlspecialchars($sessions[$selected]) ?> »</h2>
-        <form method="post" action="/admin_exercises.php">
-            <input type="hidden" name="action" value="create">
-            <input type="hidden" name="session_id" value="<?= $selected ?>">
-
-            <div>
-                <label for="exercise_name">Nom de l'exercice :</label>
-                <input type="text" id="exercise_name" name="exercise_name" required>
-            </div>
-            <div>
-                <label for="weight">Poids :</label>
-                <input type="text" id="weight" name="weight">
-            </div>
-            <div>
-                <label for="repetitions">Répétitions :</label>
-                <input type="number" id="repetitions" name="repetitions">
-            </div>
-            <div>
-                <label for="sets">Séries :</label>
-                <input type="number" id="sets" name="sets">
-            </div>
-            <div>
-                <label for="target_weight">Objectif poids :</label>
-                <input type="text" id="target_weight" name="target_weight">
-            </div>
-            <button type="submit">Ajouter</button>
-        </form>
-
-        <hr>
-        <h2>Exercices existants</h2>
-        <?php if (!empty($entries)): ?>
-            <table border="1" cellpadding="5">
-                <thead>
-                    <tr>
-                        <th>ID lien</th>
-                        <th>Nom Exercice</th>
-                        <th>Poids</th>
-                        <th>Répétitions</th>
-                        <th>Séries</th>
-                        <th>Objectif</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($entries as $e): 
-                    // Récupération du nom de l'exercice
-                    $stmt = $conn->prepare("SELECT name FROM exercises WHERE id = :eid");
-                    $stmt->execute(['eid' => $e->exercise_id]);
-                    $exoName = $stmt->fetchColumn() ?: 'Inconnu';
-                ?>
-                    <tr>
-                        <td><?= $e->id ?></td>
-                        <td><?= htmlspecialchars($exoName) ?></td>
-                        <td><?= htmlspecialchars($e->weight ?? 'N/A') ?></td>
-                        <td><?= htmlspecialchars($e->repetitions ?? 'N/A') ?></td>
-                        <td><?= htmlspecialchars($e->sets ?? 'N/A') ?></td>
-                        <td><?= htmlspecialchars($e->target_weight ?? 'N/A') ?></td>
-                        <td>
-                            <a href="/admin_exercises.php?delete=<?= $e->id ?>&amp;session_id=<?= $selected ?>"
-                               onclick="return confirm('Supprimer cet exercice de la session ?')">
-                                🗑️
-                            </a>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php else: ?>
-            <p>Aucun exercice associé à cette session.</p>
-        <?php endif; ?>
-    <?php endif; ?>
-
-    <p><a href="/admin_users.php">← Gérer les utilisateurs</a></p>
-    <p><a href="/">← Accueil</a></p>
+  <p><a href="/admin_users.php">← Gérer les utilisateurs</a></p>
+  <p><a href="/index.php">← Accueil</a></p>
 </body>
 </html>

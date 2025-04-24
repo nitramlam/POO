@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/../classes/ExerciseSession.php';
+require_once __DIR__ . '/../classes/Tailwind.php';
+
 
 // 1) Récupération de l'ID de session
 if (empty($_GET['session_id']) || !is_numeric($_GET['session_id'])) {

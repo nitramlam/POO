@@ -1,3 +1,4 @@
+
 <?php
 require_once __DIR__ . '/../classes/Database.php';
 require_once __DIR__ . '/../classes/User.php';
@@ -21,7 +22,7 @@ $users = User::fetchAll($conn);
         <ul>
             <?php foreach ($users as $u): ?>
                 <li>
-                    <a href="sessions.php?user_id=<?= htmlspecialchars($u->id) ?>">
+                    <a href="login.php?user_id=<?= htmlspecialchars($u->id) ?>">
                         <?= htmlspecialchars($u->name) ?>
                     </a>
                 </li>
