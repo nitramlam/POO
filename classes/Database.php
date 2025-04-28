@@ -1,9 +1,9 @@
 <?php
 class Database {
-    private string $host = 'db';
-    private string $db_name = 'musculation_db';
-    private string $username = 'muscu_user';
-    private string $password = 'muscu_pass';
+    private string $host = 'mysql-muscu33.alwaysdata.net'; // <- hôte AlwaysData
+    private string $db_name = 'muscu33_1';                 // <- nom de la base
+    private string $username = 'muscu33';                  // <- utilisateur AlwaysData
+    private string $password = 'musculation33';            // <- mot de passe
     private ?PDO $conn = null;
 
     public function __construct() {

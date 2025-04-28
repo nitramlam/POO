@@ -3,9 +3,11 @@
 
 class Tailwind
 {
- 
     public static function includeCdn(): string
     {
-        return '<script src="https://cdn.tailwindcss.com"></script>';
+        return '
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <script src="https://cdn.tailwindcss.com"></script>
+        ';
     }
 }
