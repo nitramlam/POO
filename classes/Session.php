@@ -14,9 +14,9 @@ class Session {
         $this->name = $name;
     }
 
-    // 1) Récupère toutes les sessions
+    // 1) Récupère toutes les sessions d'un utilisateur
     public static function fetchByUser(PDO $conn, int $userId): array {
-        $stmt = $conn->prepare("SELECT id, user_id, name FROM sessions WHERE user_id = :uid");
+        $stmt = $conn->prepare('SELECT id, user_id, name FROM sessions WHERE user_id = :uid');
         $stmt->execute(['uid' => $userId]);
         $sessions = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -31,19 +31,19 @@ class Session {
 
     // 2) Crée une session
     public static function create(PDO $conn, int $userId, string $name): bool {
-        $stmt = $conn->prepare("INSERT INTO sessions (user_id, name) VALUES (:uid, :name)");
+        $stmt = $conn->prepare('INSERT INTO sessions (user_id, name) VALUES (:uid, :name)');
         return $stmt->execute(['uid' => $userId, 'name' => $name]);
     }
 
     // 3) Supprime une session
     public static function delete(PDO $conn, int $sessionId, int $userId): bool {
-        $stmt = $conn->prepare("DELETE FROM sessions WHERE id = :id AND user_id = :uid");
+        $stmt = $conn->prepare('DELETE FROM sessions WHERE id = :id AND user_id = :uid');
         return $stmt->execute(['id' => $sessionId, 'uid' => $userId]);
     }
 
     // 4) Met à jour une session
     public static function update(PDO $conn, int $sessionId, int $userId, string $name): bool {
-        $stmt = $conn->prepare("UPDATE sessions SET name = :name WHERE id = :id AND user_id = :uid");
+        $stmt = $conn->prepare('UPDATE sessions SET name = :name WHERE id = :id AND user_id = :uid');
         return $stmt->execute(['name' => $name, 'id' => $sessionId, 'uid' => $userId]);
     }
 
@@ -55,9 +55,9 @@ class Session {
         return $_SESSION['user_id'] ?? null;
     }
 
-    // 6) Récupère son nom
+    // 6) Récupère le nom de l'utilisateur connecté
     public static function getCurrentUserName(PDO $conn, int $userId): string {
-        $stmt = $conn->prepare("SELECT name FROM users WHERE id = :uid");
+        $stmt = $conn->prepare('SELECT name FROM users WHERE id = :uid');
         $stmt->execute(['uid' => $userId]);
         return $stmt->fetchColumn() ?: 'Utilisateur';
     }
@@ -66,24 +66,70 @@ class Session {
     public static function handleActions(PDO $conn, int $userId): void {
         if (!empty($_GET['delete']) && is_numeric($_GET['delete'])) {
             self::delete($conn, (int)$_GET['delete'], $userId);
-            header('Location: /sessions.php');
-            exit;
+            header('Location: /sessions.php'); exit;
         }
-
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $action = $_POST['action'] ?? '';
-            $name = trim($_POST['session_name'] ?? '');
-
+            $name   = trim($_POST['session_name'] ?? '');
             if ($action === 'create' && $name !== '') {
                 self::create($conn, $userId, mb_substr($name, 0, 20));
             } elseif ($action === 'update') {
-                $id = (int) ($_POST['id'] ?? 0);
+                $id = (int)($_POST['id'] ?? 0);
                 if ($id > 0 && $name !== '') {
                     self::update($conn, $id, $userId, mb_substr($name, 0, 20));
                 }
             }
-            header('Location: /sessions.php');
-            exit;
+            header('Location: /sessions.php'); exit;
         }
+    }
+
+    // 8) Récupère toutes les sessions pour l'admin
+    public static function fetchAllWithUsers(PDO $conn): array {
+        $stmt = $conn->query(
+            'SELECT s.id, u.name AS user_name, s.name AS session_name
+             FROM sessions s
+             JOIN users u ON s.user_id = u.id
+             ORDER BY u.name, s.name'
+        );
+        $sessions = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $sessions[] = [
+                'id'    => (int)$row['id'],
+                'label' => "{$row['user_name']} — {$row['session_name']}"
+            ];
+        }
+        return $sessions;
+    }
+
+    // 9) Récupère l'ID de session depuis la requête
+    public static function getCurrentSessionId(): ?int {
+        if (!empty($_GET['session_id']) && is_numeric($_GET['session_id'])) {
+            return (int)$_GET['session_id'];
+        }
+        return null;
+    }
+
+    // 10) Récupère nom de session et utilisateur
+    public static function getSessionInfo(PDO $conn, int $sessionId): array {
+        $stmt = $conn->prepare(
+            'SELECT s.name AS session_name, u.name AS user_name
+             FROM sessions s
+             JOIN users u ON s.user_id = u.id
+             WHERE s.id = :sid'
+        );
+        $stmt->execute(['sid' => $sessionId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        return [
+            $row['session_name'] ?? 'Inconnue',
+            $row['user_name']    ?? 'Utilisateur inconnu'
+        ];
+    }
+
+    // 11) Récupère l'ID en édition
+    public static function getEditEntryId(): ?int {
+        if (!empty($_GET['edit']) && is_numeric($_GET['edit'])) {
+            return (int)$_GET['edit'];
+        }
+        return null;
     }
 }
