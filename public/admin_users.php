@@ -1,45 +1,16 @@
 <?php
-// public/admin_users.php : gestion des utilisateurs responsive avec Tailwind
-
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/../classes/User.php';
 require_once __DIR__ . '/../classes/Tailwind.php';
 
-// CRUD
-if (!empty($_GET['delete']) && is_numeric($_GET['delete'])) {
-    User::delete($conn, (int)$_GET['delete']);
-    header('Location: /admin_users.php#user-' . (int)$_GET['delete']);
-    exit;
-}
+// 1) Gestion des actions CRUD (create, update, delete)
+User::handleActions($conn);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action']) && $_POST['action'] === 'create') {
-        $name = trim($_POST['name'] ?? '');
-        if ($name !== '') {
-            User::create($conn, $name);
-        }
-    }
-    if (isset($_POST['action']) && $_POST['action'] === 'update') {
-        $id   = (int)($_POST['id'] ?? 0);
-        $name = trim($_POST['name'] ?? '');
-        if ($id > 0 && $name !== '') {
-            User::update($conn, $id, $name);
-        }
-    }
-    $anchorId = $_POST['action'] === 'update' ? $_POST['id'] : '';
-    header('Location: /admin_users.php#user-' . $anchorId);
-    exit;
-}
-
-// Récupération des utilisateurs
-$users = User::fetchAll($conn);
-
-// Mode édition
-$editId = null;
-if (!empty($_GET['edit']) && is_numeric($_GET['edit'])) {
-    $editId = (int)$_GET['edit'];
-}
+// 2) Récupération des utilisateurs
+$users  = User::fetchAll($conn);
+$editId = User::getEditId();
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -49,7 +20,6 @@ if (!empty($_GET['edit']) && is_numeric($_GET['edit'])) {
   <?= Tailwind::includeCdn() ?>
 </head>
 <body class="bg-gray-50 min-h-screen">
-
 <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Formulaire d'ajout -->
   <div class="bg-white shadow rounded-lg p-6 mb-8">
@@ -104,9 +74,9 @@ if (!empty($_GET['edit']) && is_numeric($_GET['edit'])) {
                 </svg>
               </a>
               <a href="/admin_users.php?delete=<?= $u->id ?>#user-<?= $u->id ?>"
-                 onclick="return confirm('Supprimer <?= htmlspecialchars($u->name) ?> ?')"
                  class="bg-red-500 hover:bg-red-600 text-white p-2 rounded-md transition flex items-center justify-center"
-                 title="Supprimer">
+                 title="Supprimer"
+                 onclick="return confirm('Supprimer <?= htmlspecialchars($u->name) ?> ?')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>

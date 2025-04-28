@@ -10,9 +10,12 @@ class User {
         $this->name = $name;
     }
 
-    // Lecture : tous les users
+    /**
+     * Récupère tous les utilisateurs
+     * @return User[]
+     */
     public static function fetchAll(PDO $conn): array {
-        $stmt = $conn->query("SELECT id, name FROM users");
+        $stmt = $conn->query('SELECT id, name FROM users');
         $users = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $users[] = new User((int)$row['id'], $row['name']);
@@ -20,24 +23,69 @@ class User {
         return $users;
     }
 
-    // Création : ajoute un user, retourne son ID ou false
+    /**
+     * Crée un nouvel utilisateur
+     * @return int|false ID du nouvel utilisateur ou false
+     */
     public static function create(PDO $conn, string $name) {
-        $stmt = $conn->prepare("INSERT INTO users (name) VALUES (:name)");
+        $stmt = $conn->prepare('INSERT INTO users (name) VALUES (:name)');
         if ($stmt->execute(['name' => $name])) {
             return (int)$conn->lastInsertId();
         }
         return false;
     }
 
-    // Mise à jour : renvoie true/false
+    /**
+     * Met à jour un utilisateur existant
+     */
     public static function update(PDO $conn, int $id, string $name): bool {
-        $stmt = $conn->prepare("UPDATE users SET name = :name WHERE id = :id");
+        $stmt = $conn->prepare('UPDATE users SET name = :name WHERE id = :id');
         return $stmt->execute(['name' => $name, 'id' => $id]);
     }
 
-    // Suppression : renvoie true/false
+    /**
+     * Supprime un utilisateur
+     */
     public static function delete(PDO $conn, int $id): bool {
-        $stmt = $conn->prepare("DELETE FROM users WHERE id = :id");
+        $stmt = $conn->prepare('DELETE FROM users WHERE id = :id');
         return $stmt->execute(['id' => $id]);
+    }
+
+    /**
+     * Gère les actions CRUD en une seule méthode
+     */
+    public static function handleActions(PDO $conn): void {
+        // Suppression
+        if (!empty($_GET['delete']) && is_numeric($_GET['delete'])) {
+            self::delete($conn, (int)$_GET['delete']);
+            header('Location: /admin_users.php#user-' . (int)$_GET['delete']);
+            exit;
+        }
+        // Création et mise à jour
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $action = $_POST['action'] ?? '';
+            $name   = trim($_POST['name'] ?? '');
+            if ($action === 'create' && $name !== '') {
+                self::create($conn, $name);
+            } elseif ($action === 'update') {
+                $id = (int)($_POST['id'] ?? 0);
+                if ($id > 0 && $name !== '') {
+                    self::update($conn, $id, $name);
+                }
+            }
+            $anchor = $action === 'update' ? (int)$_POST['id'] : '';
+            header('Location: /admin_users.php#user-' . $anchor);
+            exit;
+        }
+    }
+
+    /**
+     * Récupère l'ID de l'utilisateur en édition
+     */
+    public static function getEditId(): ?int {
+        if (!empty($_GET['edit']) && is_numeric($_GET['edit'])) {
+            return (int)$_GET['edit'];
+        }
+        return null;
     }
 }
