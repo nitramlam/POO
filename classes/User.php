@@ -6,14 +6,11 @@ class User {
     public string $name;
 
     public function __construct(int $id, string $name) {
-        $this->id   = $id;
+        $this->id = $id;
         $this->name = $name;
     }
 
-    /**
-     * Récupère tous les utilisateurs
-     * @return User[]
-     */
+    // Récupère tous les utilisateurs
     public static function fetchAll(PDO $conn): array {
         $stmt = $conn->query('SELECT id, name FROM users');
         $users = [];
@@ -23,10 +20,7 @@ class User {
         return $users;
     }
 
-    /**
-     * Crée un nouvel utilisateur
-     * @return int|false ID du nouvel utilisateur ou false
-     */
+    // Crée un nouvel utilisateur et retourne son ID
     public static function create(PDO $conn, string $name) {
         $stmt = $conn->prepare('INSERT INTO users (name) VALUES (:name)');
         if ($stmt->execute(['name' => $name])) {
@@ -35,25 +29,19 @@ class User {
         return false;
     }
 
-    /**
-     * Met à jour un utilisateur existant
-     */
+    // Met à jour un utilisateur existant
     public static function update(PDO $conn, int $id, string $name): bool {
         $stmt = $conn->prepare('UPDATE users SET name = :name WHERE id = :id');
         return $stmt->execute(['name' => $name, 'id' => $id]);
     }
 
-    /**
-     * Supprime un utilisateur
-     */
+    // Supprime un utilisateur
     public static function delete(PDO $conn, int $id): bool {
         $stmt = $conn->prepare('DELETE FROM users WHERE id = :id');
         return $stmt->execute(['id' => $id]);
     }
 
-    /**
-     * Gère les actions CRUD en une seule méthode
-     */
+    // Gère automatiquement les actions CRUD via les requêtes GET et POST
     public static function handleActions(PDO $conn): void {
         // Suppression
         if (!empty($_GET['delete']) && is_numeric($_GET['delete'])) {
@@ -61,10 +49,12 @@ class User {
             header('Location: /admin_users.php#user-' . (int)$_GET['delete']);
             exit;
         }
-        // Création et mise à jour
+
+        // Création ou mise à jour
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $action = $_POST['action'] ?? '';
-            $name   = trim($_POST['name'] ?? '');
+            $name = trim($_POST['name'] ?? '');
+
             if ($action === 'create' && $name !== '') {
                 self::create($conn, $name);
             } elseif ($action === 'update') {
@@ -73,15 +63,14 @@ class User {
                     self::update($conn, $id, $name);
                 }
             }
+
             $anchor = $action === 'update' ? (int)$_POST['id'] : '';
             header('Location: /admin_users.php#user-' . $anchor);
             exit;
         }
     }
 
-    /**
-     * Récupère l'ID de l'utilisateur en édition
-     */
+    // Retourne l'ID de l'utilisateur en mode édition, s'il existe
     public static function getEditId(): ?int {
         if (!empty($_GET['edit']) && is_numeric($_GET['edit'])) {
             return (int)$_GET['edit'];

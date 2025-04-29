@@ -1,30 +1,34 @@
 <?php
+
+// Gestion des exercices et affectation aux sessions
+
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/../classes/Exercises.php';
 require_once __DIR__ . '/../classes/Session.php';
 require_once __DIR__ . '/../classes/Assignment.php';
 require_once __DIR__ . '/../classes/Tailwind.php';
 
-// 1) Suppression d’une affectation existante
+// Suppression d'une affectation existante
 if (!empty($_GET['delete']) && is_numeric($_GET['delete'])) {
     Exercise::unassignFromSession($conn, (int)$_GET['delete']);
     header('Location: /admin_exercises.php');
     exit;
 }
 
-// 2) Création : exercice + assignation à plusieurs sessions
+// Création d'un nouvel exercice et affectation à des sessions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
     Exercise::createAndAssign($conn, $_POST);
     header('Location: /admin_exercises.php');
     exit;
 }
 
-// 3) Récupération des sessions (utilisateurs → sessions)
+// Chargement des sessions existantes
 $sessions = Session::fetchAllWithUsers($conn);
 
-// 4) Récupération des affectations groupées par utilisateur
+// Chargement des affectations d'exercices regroupées par utilisateur
 $assignments = Assignment::fetchGroupedByUser($conn);
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -32,10 +36,11 @@ $assignments = Assignment::fetchGroupedByUser($conn);
   <title>🏋️ Gestion des Exercices</title>
   <?= Tailwind::includeCdn() ?>
 </head>
+
 <body class="bg-gray-50 min-h-screen">
   <main class="max-w-5xl mx-auto p-6 space-y-8">
 
-    <!-- En-tête -->
+    <!-- En-tête de la page -->
     <div class="bg-white rounded-lg shadow p-6 text-center">
       <h1 class="text-2xl font-bold text-blue-800 flex items-center justify-center space-x-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -46,7 +51,7 @@ $assignments = Assignment::fetchGroupedByUser($conn);
       <p class="text-blue-600">Ajouter des exercices aux sessions</p>
     </div>
 
-    <!-- Formulaire de création -->
+    <!-- Formulaire pour créer un exercice -->
     <div class="bg-white rounded-lg shadow p-6 space-y-6">
       <h2 class="text-xl font-semibold text-gray-800 flex items-center space-x-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -56,8 +61,11 @@ $assignments = Assignment::fetchGroupedByUser($conn);
       </h2>
       <form method="post" action="/admin_exercises.php" class="space-y-4">
         <input type="hidden" name="action" value="create">
+
         <input type="text" name="exercise_name" maxlength="50" placeholder="Ex: Développé couché" required
                class="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring-blue-300 focus:border-blue-300" />
+
+        <!-- Sélection des sessions à associer -->
         <div>
           <h3 class="text-gray-700 font-medium mb-2 flex items-center space-x-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -75,6 +83,7 @@ $assignments = Assignment::fetchGroupedByUser($conn);
             <?php endforeach; ?>
           </div>
         </div>
+
         <button type="submit"
                 class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-md transition">
           + Créer et ajouter aux sessions
@@ -82,7 +91,7 @@ $assignments = Assignment::fetchGroupedByUser($conn);
       </form>
     </div>
 
-    <!-- Répartition des exercices -->
+    <!-- Répartition actuelle des exercices -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
       <div class="bg-blue-600 text-white px-6 py-3 flex items-center space-x-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -99,6 +108,8 @@ $assignments = Assignment::fetchGroupedByUser($conn);
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
               </svg>
             </summary>
+
+            <!-- Liste des exercices liés à cet utilisateur -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4">
               <?php foreach ($list as $item): ?>
                 <div class="border border-gray-200 rounded-lg p-4 flex flex-col space-y-2">
@@ -112,10 +123,12 @@ $assignments = Assignment::fetchGroupedByUser($conn);
                 </div>
               <?php endforeach; ?>
             </div>
+
           </details>
         <?php endforeach; ?>
       </div>
     </div>
+
   </main>
 </body>
 </html>

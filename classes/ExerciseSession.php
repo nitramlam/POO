@@ -19,16 +19,16 @@ class ExerciseSession {
         ?int $sets,
         ?float $target_weight
     ) {
-        $this->id            = $id;
-        $this->exercise_id   = $exercise_id;
-        $this->session_id    = $session_id;
-        $this->weight        = $weight;
-        $this->repetitions   = $repetitions;
-        $this->sets          = $sets;
+        $this->id = $id;
+        $this->exercise_id = $exercise_id;
+        $this->session_id = $session_id;
+        $this->weight = $weight;
+        $this->repetitions = $repetitions;
+        $this->sets = $sets;
         $this->target_weight = $target_weight;
     }
 
-    // fetch entries
+    // Retourne toutes les entrées d'une session
     public static function fetchBySession(PDO $conn, int $sessionId): array {
         $stmt = $conn->prepare(
             'SELECT id, exercise_id, session_id, weight, repetitions, sets, target_weight
@@ -50,7 +50,7 @@ class ExerciseSession {
         return $list;
     }
 
-    // add entry
+    // Ajoute un nouvel exercice à une session
     public static function addToSession(PDO $conn, int $sessionId, int $exerciseId, float $weight = 0, int $repetitions = 0, int $sets = 0, float $targetWeight = 0): bool {
         $stmt = $conn->prepare(
             'INSERT INTO exercises_sessions (session_id, exercise_id, weight, repetitions, sets, target_weight)
@@ -59,14 +59,14 @@ class ExerciseSession {
         return $stmt->execute([
             'sid' => $sessionId,
             'eid' => $exerciseId,
-            'w'   => $weight,
-            'r'   => $repetitions,
-            's'   => $sets,
-            'tw'  => $targetWeight
+            'w' => $weight,
+            'r' => $repetitions,
+            's' => $sets,
+            'tw' => $targetWeight
         ]);
     }
 
-    // update entry
+    // Met à jour une entrée existante
     public static function updateEntry(PDO $conn, int $id, float $weight, int $repetitions, int $sets, float $targetWeight): bool {
         $stmt = $conn->prepare(
             'UPDATE exercises_sessions
@@ -74,46 +74,55 @@ class ExerciseSession {
              WHERE id = :id'
         );
         return $stmt->execute([
-            'w'   => $weight,
-            'r'   => $repetitions,
-            's'   => $sets,
-            'tw'  => $targetWeight,
-            'id'  => $id
+            'w' => $weight,
+            'r' => $repetitions,
+            's' => $sets,
+            'tw' => $targetWeight,
+            'id' => $id
         ]);
     }
 
-    // delete entry
+    // Supprime une entrée
     public static function remove(PDO $conn, int $id): bool {
         $stmt = $conn->prepare('DELETE FROM exercises_sessions WHERE id = :id');
         return $stmt->execute(['id' => $id]);
     }
 
-    // handle create/update/delete
+    // Gère les actions de création, mise à jour et suppression
     public static function handleEntryActions(PDO $conn, int $sessionId, array $request): void {
         if (!empty($request['delete']) && is_numeric($request['delete'])) {
             self::remove($conn, (int)$request['delete']);
-            header("Location: /session_details.php?session_id={$sessionId}"); exit;
+            header("Location: /session_details.php?session_id={$sessionId}");
+            exit;
         }
+
         if (($request['action'] ?? '') === 'create') {
             $exercise = Exercise::findOrCreate($conn, trim($request['exercise_name'] ?? ''));
             self::addToSession(
                 $conn, $sessionId, $exercise->id,
-                (float)($request['weight'] ?? 0), (int)($request['repetitions'] ?? 0),
-                (int)($request['sets'] ?? 0), (float)($request['target_weight'] ?? 0)
+                (float)($request['weight'] ?? 0),
+                (int)($request['repetitions'] ?? 0),
+                (int)($request['sets'] ?? 0),
+                (float)($request['target_weight'] ?? 0)
             );
-            header("Location: /session_details.php?session_id={$sessionId}"); exit;
+            header("Location: /session_details.php?session_id={$sessionId}");
+            exit;
         }
+
         if (($request['action'] ?? '') === 'update' && !empty($request['entry_id'])) {
             self::updateEntry(
                 $conn, (int)$request['entry_id'],
-                (float)($request['weight'] ?? 0), (int)($request['repetitions'] ?? 0),
-                (int)($request['sets'] ?? 0), (float)($request['target_weight'] ?? 0)
+                (float)($request['weight'] ?? 0),
+                (int)($request['repetitions'] ?? 0),
+                (int)($request['sets'] ?? 0),
+                (float)($request['target_weight'] ?? 0)
             );
-            header("Location: /session_details.php?session_id={$sessionId}"); exit;
+            header("Location: /session_details.php?session_id={$sessionId}");
+            exit;
         }
     }
 
-    // fetch entries with exercise names
+    // Retourne toutes les entrées d'une session avec le nom de l'exercice
     public static function fetchBySessionWithNames(PDO $conn, int $sessionId): array {
         $stmt = $conn->prepare(
             'SELECT es.id, e.name AS exercise_name, es.weight, es.repetitions, es.sets, es.target_weight

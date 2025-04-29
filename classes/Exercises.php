@@ -10,7 +10,7 @@ class Exercise {
         $this->name = $name;
     }
 
-    // 1) Cherche un exercice par son nom
+    // Retourne un exercice par son nom
     public static function fetchByName(PDO $conn, string $name): ?Exercise {
         $stmt = $conn->prepare("SELECT id, name FROM exercises WHERE name = :name");
         $stmt->execute(['name' => $name]);
@@ -21,14 +21,14 @@ class Exercise {
         return null;
     }
 
-    // 2) Crée un nouvel exercice
+    // Crée un nouvel exercice
     public static function create(PDO $conn, string $name): Exercise {
         $stmt = $conn->prepare("INSERT INTO exercises (name) VALUES (:name)");
         $stmt->execute(['name' => $name]);
         return new Exercise((int)$conn->lastInsertId(), $name);
     }
 
-    // 3) Cherche ou crée un exercice
+    // Retourne un exercice existant ou le crée
     public static function findOrCreate(PDO $conn, string $name): Exercise {
         $exercise = self::fetchByName($conn, $name);
         if ($exercise) {
@@ -37,7 +37,7 @@ class Exercise {
         return self::create($conn, $name);
     }
 
-    // 4) Assigne cet exercice à une session
+    // Associe un exercice à une session
     public static function assignToSession(
         PDO $conn,
         int $exerciseId,
@@ -55,50 +55,50 @@ class Exercise {
         return $stmt->execute([
             'sid' => $sessionId,
             'eid' => $exerciseId,
-            'w'   => $weight,
-            'r'   => $reps,
-            's'   => $sets,
-            'tw'  => $targetWeight
+            'w' => $weight,
+            'r' => $reps,
+            's' => $sets,
+            'tw' => $targetWeight
         ]);
     }
 
-    // 5) Désassigne une affectation existante
+    // Supprime une association exercice-session
     public static function unassignFromSession(PDO $conn, int $assignmentId): bool {
         $stmt = $conn->prepare("DELETE FROM exercises_sessions WHERE id = :id");
         return $stmt->execute(['id' => $assignmentId]);
     }
 
-    // 6) Récupère toutes les affectations (utilisateur → exercices)
+    // Retourne toutes les affectations exercices/sessions par utilisateur
     public static function fetchAllAssignments(PDO $conn): array {
         $stmt = $conn->query(
             "SELECT es.id,
-                    u.name         AS user_name,
-                    s.name         AS session_name,
-                    e.name         AS exercise_name
-               FROM exercises_sessions es
-               JOIN exercises e  ON es.exercise_id = e.id
-               JOIN sessions s   ON es.session_id  = s.id
-               JOIN users u      ON s.user_id       = u.id
-              ORDER BY u.name, s.name, e.name"
+                    u.name AS user_name,
+                    s.name AS session_name,
+                    e.name AS exercise_name
+             FROM exercises_sessions es
+             JOIN exercises e ON es.exercise_id = e.id
+             JOIN sessions s ON es.session_id = s.id
+             JOIN users u ON s.user_id = u.id
+             ORDER BY u.name, s.name, e.name"
         );
         $assignments = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $assignments[$row['user_name']][] = [
-                'id'            => (int)$row['id'],
-                'session_name'  => $row['session_name'],
+                'id' => (int)$row['id'],
+                'session_name' => $row['session_name'],
                 'exercise_name' => $row['exercise_name']
             ];
         }
         return $assignments;
     }
 
-    // 7) Crée ou trouve un exercice, puis l'assigne à plusieurs sessions
+    // Crée un exercice et l'assigne à plusieurs sessions
     public static function createAndAssign(PDO $conn, array $data): void {
-        $name   = trim($data['exercise_name'] ?? '');
-        $ids    = array_map('intval', $data['session_ids'] ?? []);
+        $name = trim($data['exercise_name'] ?? '');
+        $ids = array_map('intval', $data['session_ids'] ?? []);
         $weight = (float)($data['weight'] ?? 0);
-        $reps   = (int)($data['repetitions'] ?? 0);
-        $sets   = (int)($data['sets'] ?? 0);
+        $reps = (int)($data['repetitions'] ?? 0);
+        $sets = (int)($data['sets'] ?? 0);
         $target = (float)($data['target_weight'] ?? 0);
 
         if ($name === '' || empty($ids)) {
@@ -107,15 +107,7 @@ class Exercise {
 
         $exercise = self::findOrCreate($conn, $name);
         foreach ($ids as $sid) {
-            self::assignToSession(
-                $conn,
-                $exercise->id,
-                $sid,
-                $weight,
-                $reps,
-                $sets,
-                $target
-            );
+            self::assignToSession($conn, $exercise->id, $sid, $weight, $reps, $sets, $target);
         }
     }
 }

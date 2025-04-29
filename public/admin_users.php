@@ -1,12 +1,15 @@
 <?php
+
+// Gestion des utilisateurs : affichage, création, modification et suppression
+
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/../classes/User.php';
 require_once __DIR__ . '/../classes/Tailwind.php';
 
-// 1) Gestion des actions CRUD (create, update, delete)
+// Traitement des actions utilisateur (ajout, modification, suppression)
 User::handleActions($conn);
 
-// 2) Récupération des utilisateurs
+// Récupération des utilisateurs existants
 $users  = User::fetchAll($conn);
 $editId = User::getEditId();
 ?>
@@ -19,9 +22,11 @@ $editId = User::getEditId();
   <title>👥 Gestion des utilisateurs</title>
   <?= Tailwind::includeCdn() ?>
 </head>
+
 <body class="bg-gray-50 min-h-screen">
 <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-  <!-- Formulaire d'ajout -->
+
+  <!-- Formulaire pour ajouter un utilisateur -->
   <div class="bg-white shadow rounded-lg p-6 mb-8">
     <form method="post" action="/admin_users.php" class="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
       <input type="hidden" name="action" value="create">
@@ -37,11 +42,13 @@ $editId = User::getEditId();
     </form>
   </div>
 
-  <!-- Liste des utilisateurs -->
+  <!-- Liste des utilisateurs existants -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
     <?php foreach ($users as $u): ?>
       <div id="user-<?= $u->id ?>" class="bg-white border border-gray-200 rounded-lg p-4 space-y-4 shadow hover:shadow-lg transition">
+        
         <?php if ($editId === $u->id): ?>
+          <!-- Formulaire d'édition d'un utilisateur -->
           <form method="post" action="/admin_users.php" class="space-y-3">
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" value="<?= $u->id ?>">
@@ -62,7 +69,9 @@ $editId = User::getEditId();
               </a>
             </div>
           </form>
+        
         <?php else: ?>
+          <!-- Affichage simple d'un utilisateur -->
           <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
             <span class="font-medium text-gray-800 truncate"><?= htmlspecialchars($u->name) ?></span>
             <div class="flex space-x-2">
@@ -83,7 +92,9 @@ $editId = User::getEditId();
               </a>
             </div>
           </div>
+
         <?php endif; ?>
+        
       </div>
     <?php endforeach; ?>
   </div>

@@ -1,11 +1,13 @@
 <?php
+
 class Database {
-    private string $host = 'mysql-muscu33.alwaysdata.net'; // <- hôte AlwaysData
-    private string $db_name = 'muscu33_1';                 // <- nom de la base
-    private string $username = 'muscu33';                  // <- utilisateur AlwaysData
-    private string $password = 'musculation33';            // <- mot de passe
+    private string $host = 'mysql-muscu33.alwaysdata.net';
+    private string $db_name = 'muscu33_1';
+    private string $username = 'muscu33';
+    private string $password = 'musculation33';
     private ?PDO $conn = null;
 
+    // Initialise la connexion à la base de données
     public function __construct() {
         try {
             $dsn = "mysql:host={$this->host};dbname={$this->db_name};charset=utf8mb4";
@@ -16,6 +18,7 @@ class Database {
         }
     }
 
+    // Retourne l'objet PDO
     public function getConnection(): PDO {
         return $this->conn;
     }

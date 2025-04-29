@@ -1,8 +1,8 @@
 <?php
 
-
 class Tailwind
 {
+    // Retourne le code HTML pour intégrer Tailwind via CDN
     public static function includeCdn(): string
     {
         return '

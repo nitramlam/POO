@@ -1,14 +1,14 @@
-# POO/docker-compose.yml
+
 services:
   web:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8123:80"                       # ton site sur localhost:8123
+      - "8123:80"                      
     volumes:
-      - ./public:/var/www/html         # tes pages web
-      - ./classes:/var/www/classes     # tes classes PHP
+      - ./public:/var/www/html         
+      - ./classes:/var/www/classes    
     depends_on:
       - db
 
@@ -21,16 +21,16 @@ services:
       MYSQL_PASSWORD: muscu_pass
     volumes:
       - db-data:/var/lib/mysql
-      - ./sql:/docker-entrypoint-initdb.d  # exécute createdb.sql au 1er lancement
+      - ./sql:/docker-entrypoint-initdb.d  
     ports:
-      - "3407:3306"                     # MySQL sur localhost:3407
+      - "3407:3306"                     
 
   phpmyadmin:
     image: phpmyadmin:latest
     environment:
       PMA_HOST: db
     ports:
-      - "8087:80"                       # phpMyAdmin sur localhost:8087
+      - "8087:80"                       
     depends_on:
       - db
 
