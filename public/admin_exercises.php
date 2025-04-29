@@ -1,30 +1,29 @@
 <?php
-// public/admin_exercises.php
-
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/../classes/Exercises.php';
 require_once __DIR__ . '/../classes/Session.php';
+require_once __DIR__ . '/../classes/Assignment.php';
 require_once __DIR__ . '/../classes/Tailwind.php';
 
-// 1) Supprimer une affectation
+// 1) Suppression d’une affectation existante
 if (!empty($_GET['delete']) && is_numeric($_GET['delete'])) {
     Exercise::unassignFromSession($conn, (int)$_GET['delete']);
     header('Location: /admin_exercises.php');
     exit;
 }
 
-// 2) Créer un exercice et l'affecter à plusieurs sessions
+// 2) Création : exercice + assignation à plusieurs sessions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
     Exercise::createAndAssign($conn, $_POST);
     header('Location: /admin_exercises.php');
     exit;
 }
 
-// 3) Récupération des sessions avec utilisateurs
+// 3) Récupération des sessions (utilisateurs → sessions)
 $sessions = Session::fetchAllWithUsers($conn);
 
-// 4) Récupération des affectations (utilisateur → exercices)
-$assignments = Exercise::fetchAllAssignments($conn);
+// 4) Récupération des affectations groupées par utilisateur
+$assignments = Assignment::fetchGroupedByUser($conn);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -71,9 +70,7 @@ $assignments = Exercise::fetchAllAssignments($conn);
               <label class="flex items-center space-x-2 p-4 border border-gray-200 rounded-lg hover:shadow">
                 <input type="checkbox" name="session_ids[]" value="<?= $s['id'] ?>"
                        class="h-5 w-5 text-blue-600 border-gray-300 rounded" />
-                <div>
-                  <p class="font-medium text-gray-800"><?= htmlspecialchars($s['label']) ?></p>
-                </div>
+                <p class="font-medium text-gray-800"><?= htmlspecialchars($s['label']) ?></p>
               </label>
             <?php endforeach; ?>
           </div>
@@ -106,17 +103,12 @@ $assignments = Exercise::fetchAllAssignments($conn);
               <?php foreach ($list as $item): ?>
                 <div class="border border-gray-200 rounded-lg p-4 flex flex-col space-y-2">
                   <h3 class="font-medium text-gray-800 flex items-center space-x-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/>
                     </svg>
                     <span><?= htmlspecialchars($item['exercise_name']) ?></span>
                   </h3>
-                  <p class="text-gray-600 flex items-center space-x-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v4m0 0v4m0-4h18"/>
-                    </svg>
-                    <span><?= htmlspecialchars($item['session_name']) ?></span>
-                  </p>
+                  <p class="text-gray-600"><strong>Séance :</strong> <?= htmlspecialchars($item['session_name']) ?></p>
                 </div>
               <?php endforeach; ?>
             </div>
